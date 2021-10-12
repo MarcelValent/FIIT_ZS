@@ -1,24 +1,54 @@
 from scapy.all import *
 from binascii import hexlify, unhexlify
 
-file = rdpcap("trace-27.pcap")
+file = rdpcap("trace-26.pcap")
 encoding = "UTF-8"
 
+class communication:
+    def __init__(self, data,ipsrc,ipdest,portsrc,portdst,protocol,id,ack,syn):
+        self.data = data
+        self.ipsrc = ipsrc
+        self.ipdest = ipdest
+        self.portsrc = portsrc
+        self.portdst = portdst
+        self.protocol = protocol
+        self.id = id
+        self.ack = ack
+        self.syn = syn
 
-def print_packet(packet_data):
+
+def print_packet(packet_data, spojovnik=0):
     pocet = 0
     for i in packet_data:
-        print('{:02X} '.format(i), end='')
-        pocet += 1
-        if pocet % 16 == 0:
-            print("")
-            continue
-        if pocet % 8 == 0:
-            print('  ', end='')
+        if spojovnik == 0:
+            pocet += 1
+            print('{:02X}'.format(i)+" ", end="")
+            if pocet % 16 == 0:
+                print(" ")
+                continue
+            if pocet % 8 == 0:
+                print("  ", end='')
+        else:
+            print('{:02X}'.format(i)+":",end="")
+            pocet += 1
+            if pocet % 5 == 0:
+                print('{:02X}'.format(i),end="")
+                break
+
+
+def print_int(packet_data,spojovnik=""):
+    l=0
+    for i in packet_data:
+        l += 1
+        if l == len(packet_data):
+            print(str(i), end='')
+        else:
+            print(str(i) + spojovnik, end='')
 
 
 def print_info(file):
     global riadok
+    ip_nodes = {}
     for l in range(0, len(file)):
         riadok = bytes(file[l])
         riadok = hexlify(riadok)
@@ -36,7 +66,9 @@ def print_info(file):
         ieee = int(hexlify(ieee), 16)
         print_type(ether, ieee)
         inside_protocol(riadok, ether, ieee)
-        #print_packet(riadok)
+        #print_packet(riadok, 0)
+        ipv4_handler(riadok, ip_nodes)
+    ipv4_printer(ip_nodes)
 
 
 def print_type(ether, ieee):
@@ -62,9 +94,9 @@ def print_mac(riadok):
     source_mac = extract_data(riadok, 0, 5)
     receive_mac = extract_data(riadok, 6, 11)
     print("Zdrojová MAC adresa: ", end="")
-    print_packet(source_mac)
+    print_packet(source_mac,1)
     print("\nCieľová MAC adresa: ", end="")
-    print_packet(receive_mac)
+    print_packet(receive_mac,1)
 
 
 def load_from_file(file_name, dictionary):
@@ -161,4 +193,29 @@ def inside_protocol(riadok, ether, ieee):
         print("IPX")
 
 
+def ipv4_handler(data, dict):
+
+    if extract_data(data, 12, 13,True) == 2048:
+        source_ip = extract_data(data, 26, 29)
+        if source_ip in dict:
+            dict[source_ip] += 1
+        else:
+            dict[source_ip] = 1
+    return dict
+
+
+def ipv4_printer(ipnodes):
+    print("\nZoznam odosielajúcich IP: ")
+
+    for l in ipnodes:
+        print_int(l ,".")
+        print()
+    print("Adresa uzla s najvyšším počtom prijatých IPV4 packetov: ", end="")
+    print_int(max(ipnodes,key=lambda k: ipnodes[k]),".")
+    print(" prijala spolu",ipnodes.get(max(ipnodes,key=lambda k: ipnodes[k])), "paketov")
+
+
+f = open('out.txt', 'w')
+sys.stdout = f
 print_info(file)
+
