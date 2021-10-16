@@ -1,11 +1,11 @@
 from scapy.all import *
 from binascii import hexlify, unhexlify
 
-file = rdpcap("trace-26.pcap")
 encoding = "UTF-8"
 
+
 class communication:
-    def __init__(self, data,ipsrc,ipdest,portsrc,portdst,protocol,id,ack,syn):
+    def __init__(self, data, ipsrc, ipdest, portsrc, portdst, protocol, id, ack, syn, reset, push, fin):
         self.data = data
         self.ipsrc = ipsrc
         self.ipdest = ipdest
@@ -15,10 +15,13 @@ class communication:
         self.id = id
         self.ack = ack
         self.syn = syn
+        self.reset = reset
+        self.push = push
+        self.fin = fin
 
 
 def print_packet(packet_data, spojovnik=0):
-    pocet = 0
+    pocet = 1
     for i in packet_data:
         if spojovnik == 0:
             pocet += 1
@@ -29,15 +32,16 @@ def print_packet(packet_data, spojovnik=0):
             if pocet % 8 == 0:
                 print("  ", end='')
         else:
-            print('{:02X}'.format(i)+":",end="")
-            pocet += 1
-            if pocet % 5 == 0:
-                print('{:02X}'.format(i),end="")
+            if pocet % 6 != 0:
+                print('{:02X}'.format(i) + ":", end="")
+                pocet += 1
+            else:
+                print('{:02X}'.format(i), end="")
                 break
 
 
-def print_int(packet_data,spojovnik=""):
-    l=0
+def print_int(packet_data, spojovnik=""):
+    l = 0
     for i in packet_data:
         l += 1
         if l == len(packet_data):
@@ -66,7 +70,7 @@ def print_info(file):
         ieee = int(hexlify(ieee), 16)
         print_type(ether, ieee)
         inside_protocol(riadok, ether, ieee)
-        #print_packet(riadok, 0)
+        print_packet(riadok, 0)
         ipv4_handler(riadok, ip_nodes)
     ipv4_printer(ip_nodes)
 
@@ -94,9 +98,9 @@ def print_mac(riadok):
     source_mac = extract_data(riadok, 0, 5)
     receive_mac = extract_data(riadok, 6, 11)
     print("Zdrojová MAC adresa: ", end="")
-    print_packet(source_mac,1)
+    print_packet(source_mac, 1)
     print("\nCieľová MAC adresa: ", end="")
-    print_packet(receive_mac,1)
+    print_packet(receive_mac, 1)
 
 
 def load_from_file(file_name, dictionary):
@@ -116,7 +120,6 @@ def print_ip(sour_start, sour_end, dest_start, dest_end):
             print(str(k), end='')
         else:
             print(str(k) + ".", end='')
-
 
     print("\nCieľová IP adresa: ", end='')
     count2 = 0
@@ -195,7 +198,7 @@ def inside_protocol(riadok, ether, ieee):
 
 def ipv4_handler(data, dict):
 
-    if extract_data(data, 12, 13,True) == 2048:
+    if extract_data(data, 12, 13, True) == 2048:
         source_ip = extract_data(data, 26, 29)
         if source_ip in dict:
             dict[source_ip] += 1
@@ -208,14 +211,143 @@ def ipv4_printer(ipnodes):
     print("\nZoznam odosielajúcich IP: ")
 
     for l in ipnodes:
-        print_int(l ,".")
+        print_int(l , ".")
         print()
     print("Adresa uzla s najvyšším počtom prijatých IPV4 packetov: ", end="")
-    print_int(max(ipnodes,key=lambda k: ipnodes[k]),".")
-    print(" prijala spolu",ipnodes.get(max(ipnodes,key=lambda k: ipnodes[k])), "paketov")
+    print_int(max(ipnodes, key=lambda k: ipnodes[k]), ".")
+    print(" prijala spolu", ipnodes.get(max(ipnodes, key=lambda k: ipnodes[k])), "paketov")
 
 
-f = open('out.txt', 'w')
-sys.stdout = f
-print_info(file)
+def checker(riadok, ether):
+    ports = {}
+    ip_header = extract_data(riadok, 23, 23, True)
+    if ip_header == 6:
+        load_from_file("tcp_ports.txt", ports)
+    if ether == 2048:
+        help = extract_data(transport_protocol(riadok), 0, 1, True)
+        help2 = extract_data(transport_protocol(riadok), 2, 3, True)
+        if help in ports:
+            vysledok = ports.get(help)
+            return vysledok
+        elif help2 in ports:
+            vysledok = ports.get(help2)
+            return vysledok
+    else:
+        return False
 
+
+def tcp_check(arr, riadok, ether, typeofframe, number):
+    ports = {}
+    load_from_file("tcp_ports.txt", ports)
+    if typeofframe == "HTTP" or typeofframe == "HTTPS" or typeofframe == "TELNET" or typeofframe == "SSH" or typeofframe == "FTP datove" or typeofframe == "FTP riadiace":
+        if ether == 2048:
+            if extract_data(riadok, 23, 23, True) == 6:
+                help = transport_protocol(riadok)
+                if checker(riadok, ether) == typeofframe:
+                    arr.append(communication(riadok, extract_data(riadok, 26, 29), extract_data(riadok, 30, 33), extract_data(help, 0, 1), extract_data(help, 2, 3), checker(riadok, ether), number, False, False, False, False, False))
+                    return arr
+    else:
+        return False
+
+
+def flaganalyzator(arr):
+    for i in range(len(arr)):
+        bin(extract_data(transport_protocol(arr[i].data), 13, 13, True))
+        x = str(bin(extract_data(transport_protocol(arr[i].data), 13, 13, True)))[2:]
+        if len(x) < 5:
+            help = 5 - len(x)
+            x = (help*"0")+str(x)
+        if str[1] == 1:
+            arr[i].ack = True
+        if str[2] == 1:
+            arr[i].push = True
+        if str[3] == 1:
+            arr[i].reset = True
+        if str[4] == 1:
+            arr[i].syn = True
+        if str[5] == 1:
+            arr[i].fin = True
+    return arr
+
+
+def printother(file, typeofframe):
+    global riadok
+    tcp = []
+    if typeofframe == "http":
+        typeofframe = 'HTTP'
+    if typeofframe == "https":
+        typeofframe = 'HTTPS'
+    if typeofframe == "telnet":
+        typeofframe = 'TELNET'
+    if typeofframe == "ftpd":
+        typeofframe = 'FTP datove'
+    if typeofframe == "ftpr":
+        typeofframe = 'FTP riadiace'
+    if typeofframe == "ssh":
+        typeofframe = 'SSH'
+
+
+    for l in range(len(file)):
+        riadok = bytes(file[l])
+        ether = extract_data(riadok, 12, 13)
+        ether = int(hexlify(ether), 16)
+        tcp_check(tcp, riadok, ether, typeofframe, l)
+    flaganalyzator(tcp)
+    #for i in range(len(tcp)):
+     #   print("Rámec číslo " + str(tcp[i].id))
+      #  print(tcp[i].protocol)
+
+
+
+
+
+def main():
+    print()
+    print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+    print("|*|                   Analyzátor sieťovej komunikácie                      |*|")
+    print("|*|                         Autor: Marcel Valent                           |*|")
+    print("|*|                              ZS 2021/2022                              |*|")
+    print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+    print()
+    print("Zadaj súbor na analýzu rámcov:   ", end="")
+    file = rdpcap(input())
+    print("Aké rámce chceš analyzovať?\n     a - all frames\n     i - input frame")
+    print("Zvoľ si: ", end="")
+    k = input().lower()
+    if k == "a":
+        print("Chceš výstup do súboru alebo console? \n     c - console\n     f - file")
+        print("Zvoľ si: ", end="")
+        d = input().lower()
+        if d == "f":
+            fileout = open('out.txt', 'w')
+            sys.stdout = fileout
+            print_info(file)
+            fileout.close()
+        elif d == "c":
+            print_info(file)
+    if k == "i":
+        print("Vyber si typ aký typ rámca chceš analyzovať.")
+        print("     http - pre výpis HTTP rámcov")
+        print("     https - pre výpis HTTPS rámcov")
+        print("     telnet - pre výpis TELNET rámcov")
+        print("     ssh - pre výpis SSH rámcov")
+        print("     ftpr - pre výpis FTP riadiace rámcov")
+        print("     ftpd - pre výpis FTP dátové rámcov")
+        print("     tftp - pre výpis TFTP rámcov")
+        print("     icmp - pre výpis ICMP rámcov")
+        print("     arp - pre výpis ARP rámcov")
+        print("Zvoľ si: ", end="")
+        ramec = input().lower()
+        print("Chceš výstup do súboru alebo console? \n     c - console\n     f - file")
+        print("Zvoľ si: ", end="")
+        d = input().lower()
+        if d == "f":
+            fileout = open('out.txt', 'w')
+            sys.stdout = fileout
+            printother(file, ramec)
+            fileout.close()
+        elif d == "c":
+            printother(file, ramec)
+
+
+main()
