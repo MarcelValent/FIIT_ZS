@@ -131,6 +131,26 @@ def print_ip(sour_start, sour_end, dest_start, dest_end):
             print(str(l) + ".", end='')
 
 
+def print_ip2(src, dest):
+    count = 0
+    print("\nZdrojová IP adresa: ", end='')
+    for k in src:
+        count += 1
+        if count == len(src):
+            print(str(k), end='')
+        else:
+            print(str(k) + ".", end='')
+
+    print("\nCieľová IP adresa: ", end='')
+    count2 = 0
+    for l in dest:
+        count2 += 1
+        if count2 == len(dest):
+            print(str(l))
+        else:
+            print(str(l) + ".", end='')
+
+
 def transport_protocol(help):
     head = (extract_data(help, 14, 14, True) - int(extract_data(help, 14, 14, True) / 16) * 16) * 4
     return help[14 + head:len(help)]
@@ -244,7 +264,7 @@ def tcp_check(arr, riadok, ether, typeofframe, number):
             if extract_data(riadok, 23, 23, True) == 6:
                 help = transport_protocol(riadok)
                 if checker(riadok, ether) == typeofframe:
-                    arr.append(communication(riadok, extract_data(riadok, 26, 29), extract_data(riadok, 30, 33), extract_data(help, 0, 1), extract_data(help, 2, 3), checker(riadok, ether), number, False, False, False, False, False))
+                    arr.append(communication(riadok, extract_data(riadok, 26, 29), extract_data(riadok, 30, 33), extract_data(help, 0, 1), extract_data(help, 2, 3), checker(riadok, ether), number+1, False, False, False, False, False))
                     return arr
     else:
         return False
@@ -257,20 +277,149 @@ def flaganalyzator(arr):
         if len(x) < 5:
             help = 5 - len(x)
             x = (help*"0")+str(x)
-        if str[1] == 1:
+        if x[0] == "1":
             arr[i].ack = True
-        if str[2] == 1:
+        if x[1] == "1":
             arr[i].push = True
-        if str[3] == 1:
+        if x[2] == "1":
             arr[i].reset = True
-        if str[4] == 1:
+        if x[3] == "1":
             arr[i].syn = True
-        if str[5] == 1:
+        if x[4] == "1":
             arr[i].fin = True
     return arr
 
 
-def printother(file, typeofframe):
+def comanalysis(arr):
+    finalcomm = []
+    for i in range(len(arr)):
+        if arr[i].syn == True:
+            last_dest = arr[i].ipdest
+            last_src = arr[i].ipsrc
+            last_port_src = arr[i].portsrc
+            last_port_dest = arr[i].portdst
+            if arr[i] not in finalcomm:
+                finalcomm.append(arr[i])
+            for j in range(i+1,len(arr)):
+                if arr[j].syn == True and arr[j].ack == True and last_dest == arr[j].ipsrc and last_src == arr[j].ipdest and last_port_src == arr[j].portdst and last_port_dest == arr[j].portsrc:
+                    last_dest = arr[j].ipdest
+                    last_src = arr[j].ipsrc
+                    last_port_src = arr[j].portsrc
+                    last_port_dest = arr[j].portdst
+                    if arr[j] not in finalcomm:
+                        finalcomm.append(arr[j])
+                    for k in range(j+1, len(arr)):
+                        if arr[k].ack == True and last_dest == arr[k].ipsrc and last_src == arr[k].ipdest and last_port_src == arr[k].portdst and last_port_dest == arr[k].portsrc:
+                            if arr[k] not in finalcomm:
+                                finalcomm.append(arr[k])
+                            for l in range(k+1, len(arr)):
+                                if (last_dest == arr[l].ipsrc and last_src == arr[l].ipdest and last_port_src == arr[l].portdst and last_port_dest == arr[l].portsrc) or (last_dest == arr[l].ipdest and last_src == arr[l].ipsrc and last_port_src == arr[l].portsrc and last_port_dest == arr[l].portdst):
+                                    last_dest = arr[l].ipdest
+                                    last_src = arr[l].ipsrc
+                                    last_port_src = arr[l].portsrc
+                                    last_port_dest = arr[l].portdst
+                                    if arr[l] not in finalcomm:
+                                        finalcomm.append(arr[l])
+                                    if (arr[l].ack == True and arr[l].fin == True and last_dest == arr[l].ipsrc and last_src == arr[l].ipdest and last_port_src == arr[l].portdst and last_port_dest == arr[l].portsrc) or (last_dest == arr[l].ipdest and last_src == arr[l].ipsrc and last_port_src == arr[l].portsrc and last_port_dest == arr[l].portdst and arr[l].ack == True and arr[l].fin == True):
+                                        for m in range(l+1,len(arr)):
+                                            if (arr[m].fin == True and arr[m].ack == True and last_dest == arr[m].ipsrc and last_src == arr[m].ipdest and last_port_src == arr[m].portdst and last_port_dest == arr[m].portsrc) or (last_dest == arr[m].ipdest and last_src == arr[m].ipsrc and last_port_src == arr[m].portsrc and last_port_dest == arr[m].portdst and arr[m].fin == True and arr[m].ack == True):
+                                                for n in range(m+1, len(arr)):
+                                                    if (arr[n].ack == True and arr[m].ipsrc and last_src == arr[n].ipdest and last_port_src == arr[n].portdst and last_port_dest == arr[n].portsrc) or (last_dest == arr[n].ipdest and last_src == arr[n].ipsrc and last_port_src == arr[n].portsrc and last_port_dest == arr[n].portdst and arr[n].ack == True):
+                                                        if arr[m] not in finalcomm:
+                                                            finalcomm.append(arr[m])
+                                                        if arr[n] not in finalcomm:
+                                                            finalcomm.append(arr[n])
+                                                        return finalcomm
+                                            if (arr[m].ack == True and last_dest == arr[m].ipsrc and last_src == arr[m].ipdest and last_port_src == arr[m].portdst and last_port_dest == arr[m].portsrc) or (last_dest == arr[m].ipdest and last_src == arr[m].ipsrc and last_port_src == arr[m].portsrc and last_port_dest == arr[m].portdst and arr[m].ack == True):
+                                                for n in range(m + 1, len(arr)):
+                                                    if (arr[n].fin == True and arr[n].ack == True and last_dest == arr[n].ipsrc and last_src == arr[n].ipdest and last_port_src == arr[n].portdst and last_port_dest == arr[n].portsrc) or (last_dest == arr[n].ipdest and last_src == arr[n].ipsrc and last_port_src == arr[n].portsrc and last_port_dest == arr[n].portdst):
+                                                        for o in (n+1, len(arr)):
+                                                            if (arr[o].ack == True and last_dest == arr[o].ipsrc and last_src == arr[o].ipdest and last_port_src == arr[o].portdst and last_port_dest == arr[o].portsrc) or (last_dest == arr[o].ipdest and last_src == arr[o].ipsrc and last_port_src == arr[o].portsrc and last_port_dest == arr[o].portdst):
+                                                                if arr[m] not in finalcomm:
+                                                                    finalcomm.append(arr[m])
+                                                                if arr[n] not in finalcomm:
+                                                                    finalcomm.append(arr[n])
+                                                                if arr[o] not in finalcomm:
+                                                                    finalcomm.append(arr[o])
+                                                                return finalcomm
+                                    elif (arr[l].reset == True and last_dest == arr[l].ipsrc and last_src == arr[l].ipdest and last_port_src == arr[l].portdst and last_port_dest == arr[l].portsrc) or (last_dest == arr[l].ipdest and last_src == arr[l].ipsrc and last_port_src == arr[l].portsrc and last_port_dest == arr[l].portdst and arr[l].reset == True):
+                                        return finalcomm
+                                    elif (arr[l].reset == True and arr[l].ack == True and last_dest == arr[l].ipsrc and last_src == arr[l].ipdest and last_port_src == arr[l].portdst and last_port_dest == arr[l].portsrc) or (last_dest == arr[l].ipdest and last_src == arr[l].ipsrc and last_port_src == arr[l].portsrc and last_port_dest == arr[l].portdst and arr[l].reset == True and arr[l].ack == True):
+                                        return finalcomm
+
+    return "False"
+
+def incomplete(arr):
+    incompletecomm = []
+    for i in range(len(arr)):
+        tupec = False
+        if arr[i].syn == True:
+            if len(incompletecomm) >=1:
+                return incompletecomm
+            last_dest = arr[i].ipdest
+            last_src = arr[i].ipsrc
+            last_port_src = arr[i].portsrc
+            last_port_dest = arr[i].portdst
+            if arr[i] not in incompletecomm:
+                incompletecomm.append(arr[i])
+            for j in range(i+1,len(arr)):
+                if arr[j].syn == True and arr[j].ack == True and last_dest == arr[j].ipsrc and last_src == arr[j].ipdest and last_port_src == arr[j].portdst and last_port_dest == arr[j].portsrc:
+                    last_dest = arr[j].ipdest
+                    last_src = arr[j].ipsrc
+                    last_port_src = arr[j].portsrc
+                    last_port_dest = arr[j].portdst
+                    if arr[j] not in incompletecomm:
+                        incompletecomm.append(arr[j])
+                    for k in range(j+1, len(arr)):
+                        if arr[k].ack == True and last_dest == arr[k].ipsrc and last_src == arr[k].ipdest and last_port_src == arr[k].portdst and last_port_dest == arr[k].portsrc:
+                            if arr[k] not in incompletecomm:
+                                incompletecomm.append(arr[k])
+                            for l in range(k+1, len(arr)):
+                                if (last_dest == arr[l].ipsrc and last_src == arr[l].ipdest and last_port_src == arr[l].portdst and last_port_dest == arr[l].portsrc) or (last_dest == arr[l].ipdest and last_src == arr[l].ipsrc and last_port_src == arr[l].portsrc and last_port_dest == arr[l].portdst):
+                                    last_dest = arr[l].ipdest
+                                    last_src = arr[l].ipsrc
+                                    last_port_src = arr[l].portsrc
+                                    last_port_dest = arr[l].portdst
+                                    if arr[l] not in incompletecomm:
+                                        incompletecomm.append(arr[l])
+                                    if (arr[l].ack == True and arr[l].fin == True and last_dest == arr[l].ipsrc and last_src == arr[l].ipdest and last_port_src == arr[l].portdst and last_port_dest == arr[l].portsrc) or (last_dest == arr[l].ipdest and last_src == arr[l].ipsrc and last_port_src == arr[l].portsrc and last_port_dest == arr[l].portdst and arr[l].ack == True and arr[l].fin == True):
+                                        for m in range(l+1,len(arr)):
+                                            if (arr[m].fin == True and arr[m].ack == True and last_dest == arr[m].ipsrc and last_src == arr[m].ipdest and last_port_src == arr[m].portdst and last_port_dest == arr[m].portsrc) or (last_dest == arr[m].ipdest and last_src == arr[m].ipsrc and last_port_src == arr[m].portsrc and last_port_dest == arr[m].portdst and arr[m].fin == True and arr[m].ack == True):
+                                                for n in range(m+1, len(arr)):
+                                                    if (arr[n].ack == True and arr[m].ipsrc and last_src == arr[n].ipdest and last_port_src == arr[n].portdst and last_port_dest == arr[n].portsrc) or (last_dest == arr[n].ipdest and last_src == arr[n].ipsrc and last_port_src == arr[n].portsrc and last_port_dest == arr[n].portdst and arr[n].ack == True):
+                                                        incompletecomm.clear()
+                                                        tupec = True
+                                                if tupec:
+                                                    break
+                                            if (arr[m].ack == True and last_dest == arr[m].ipsrc and last_src == arr[m].ipdest and last_port_src == arr[m].portdst and last_port_dest == arr[m].portsrc) or (last_dest == arr[m].ipdest and last_src == arr[m].ipsrc and last_port_src == arr[m].portsrc and last_port_dest == arr[m].portdst and arr[m].ack == True):
+                                                for n in range(m + 1, len(arr)):
+                                                    if (arr[n].fin == True and arr[n].ack == True and last_dest == arr[n].ipsrc and last_src == arr[n].ipdest and last_port_src == arr[n].portdst and last_port_dest == arr[n].portsrc) or (last_dest == arr[n].ipdest and last_src == arr[n].ipsrc and last_port_src == arr[n].portsrc and last_port_dest == arr[n].portdst):
+                                                        for o in (n, len(arr)):
+                                                            if (arr[o].ack == True and last_dest == arr[o].ipsrc and last_src == arr[o].ipdest and last_port_src == arr[o].portdst and last_port_dest == arr[o].portsrc) or (last_dest == arr[o].ipdest and last_src == arr[o].ipsrc and last_port_src == arr[o].portsrc and last_port_dest == arr[o].portdst):
+                                                                incompletecomm.clear()
+                                                                tupec = True
+                                                                break
+                                                        if tupec:
+                                                            break
+                                            if tupec:
+                                                break
+                                    elif (arr[l].reset == True and last_dest == arr[l].ipsrc and last_src == arr[l].ipdest and last_port_src == arr[l].portdst and last_port_dest == arr[l].portsrc) or (last_dest == arr[l].ipdest and last_src == arr[l].ipsrc and last_port_src == arr[l].portsrc and last_port_dest == arr[l].portdst and arr[l].reset == True):
+                                        incompletecomm.clear()
+                                        tupec = True
+                                    elif (arr[l].reset == True and arr[l].ack == True and last_dest == arr[l].ipsrc and last_src == arr[l].ipdest and last_port_src == arr[l].portdst and last_port_dest == arr[l].portsrc) or (last_dest == arr[l].ipdest and last_src == arr[l].ipsrc and last_port_src == arr[l].portsrc and last_port_dest == arr[l].portdst and arr[l].reset == True and arr[l].ack == True):
+                                        incompletecomm.clear()
+                                        tupec = True
+                                if tupec:
+                                    break
+                        if tupec:
+                            break
+                if tupec:
+                    break
+            continue
+    return incompletecomm
+
+
+def printTCP(file, typeofframe):
     global riadok
     tcp = []
     if typeofframe == "http":
@@ -293,13 +442,108 @@ def printother(file, typeofframe):
         ether = int(hexlify(ether), 16)
         tcp_check(tcp, riadok, ether, typeofframe, l)
     flaganalyzator(tcp)
-    #for i in range(len(tcp)):
-     #   print("Rámec číslo " + str(tcp[i].id))
-      #  print(tcp[i].protocol)
-
-
-
-
+    x = comanalysis(tcp)
+    y = incomplete(tcp)
+    if x == "False":
+        print("Vzorka neobsahuje správne začatú a správne ukončenú komunikáciu.")
+    else:
+        if len(x) >= 20:
+            print("Výpis kompletnej komunikacie: ")
+            print("------------------------------------------------------------")
+            for o in range(10):
+                print("\n\nRámec: " + str(x[o].id))
+                print("Dĺžka rámca poskytnutá pcap API: " + str(len(x[o].data) / 2)[:-2] + "B")
+                if len(x[o].data) / 2 + 4 > 64:
+                    print("Dĺžka rámca prenášaného po médiu: " + str(len(x[o].data) / 2 + 4)[:-2] + "B")
+                else:
+                    print("Dĺžka rámca prenášaného po médiu: 64B")
+                print_mac(x[o].data)
+                print_ip2(x[o].ipsrc, x[o].ipdest)
+                print(x[o].protocol)
+                print("Zdrojový port: " + str(int(hexlify(x[o].portsrc), 16)))
+                print("Cielový port: " + str(int(hexlify(x[o].portdst), 16)))
+                print_packet(x[o].data)
+            for p in range(len(x)-10,len(x)):
+                print("\n\nRámec: " + str(x[p].id))
+                print("Dĺžka rámca poskytnutá pcap API: " + str(len(x[p].data) / 2)[:-2] + "B")
+                if len(x[p].data) / 2 + 4 > 64:
+                    print("Dĺžka rámca prenášaného po médiu: " + str(len(x[p].data) / 2 + 4)[:-2] + "B")
+                else:
+                    print("Dĺžka rámca prenášaného po médiu: 64B")
+                print_mac(x[p].data)
+                print_ip2(x[p].ipsrc, x[p].ipdest)
+                print(x[p].protocol)
+                print("Zdrojový port: " + str(int(hexlify(x[p].portsrc), 16)))
+                print("Cielový port: " + str(int(hexlify(x[p].portdst), 16)))
+                print_packet(x[p].data)
+            print("\n------------------------------------------------------------")
+        else:
+            print("Výpis kompletnej komunikacie: ")
+            print("------------------------------------------------------------")
+            for i in range(len(x)):
+                print("\n\nRámec: " + str(x[i].id))
+                print("Dĺžka rámca poskytnutá pcap API: " + str(len(x[i].data) / 2)[:-2] + "B")
+                if len(x[i].data) / 2 + 4 > 64:
+                    print("Dĺžka rámca prenášaného po médiu: " + str(len(x[i].data) / 2 + 4)[:-2] + "B")
+                else:
+                    print("Dĺžka rámca prenášaného po médiu: 64B")
+                print_mac(x[i].data)
+                print_ip2(x[i].ipsrc, x[i].ipdest)
+                print(x[i].protocol)
+                print("Zdrojový port: " + str(int(hexlify(x[i].portsrc), 16)))
+                print("Cielový port: " + str(int(hexlify(x[i].portdst), 16)))
+                print_packet(x[i].data)
+            print("\n------------------------------------------------------------")
+    if len(y) == 0:
+        print("Vzorka neobsahuje správne začatú a nesprávne ukončenú komunikáciu.")
+    else:
+        if len(y) >= 20:
+            print("Výpis nekompletnej komunikacie: ")
+            print("------------------------------------------------------------")
+            for a in range(10):
+                print("\n\nRámec: " + str(y[a].id))
+                print("Dĺžka rámca poskytnutá pcap API: " + str(len(y[a].data) / 2)[:-2] + "B")
+                if len(y[a].data) / 2 + 4 > 64:
+                    print("Dĺžka rámca prenášaného po médiu: " + str(len(y[a].data) / 2 + 4)[:-2] + "B")
+                else:
+                    print("Dĺžka rámca prenášaného po médiu: 64B")
+                print_mac(y[a].data)
+                print_ip2(y[a].ipsrc, y[a].ipdest)
+                print(y[a].protocol)
+                print("Zdrojový port: " + str(int(hexlify(y[a].portsrc), 16)))
+                print("Cielový port: " + str(int(hexlify(y[a].portdst), 16)))
+                print_packet(y[a].data)
+            for b in range(len(y)-10,len(y)):
+                print("\n\nRámec: " + str(y[b].id))
+                print("Dĺžka rámca poskytnutá pcap API: " + str(len(y[b].data) / 2)[:-2] + "B")
+                if len(y[b].data) / 2 + 4 > 64:
+                    print("Dĺžka rámca prenášaného po médiu: " + str(len(y[b].data) / 2 + 4)[:-2] + "B")
+                else:
+                    print("Dĺžka rámca prenášaného po médiu: 64B")
+                print_mac(y[b].data)
+                print_ip2(y[b].ipsrc, y[b].ipdest)
+                print(y[b].protocol)
+                print("Zdrojový port: " + str(int(hexlify(y[b].portsrc), 16)))
+                print("Cielový port: " + str(int(hexlify(y[b].portdst), 16)))
+                print_packet(y[b].data)
+            print("\n------------------------------------------------------------")
+        else:
+            print("Výpis nekompletnej komunikacie: ")
+            print("------------------------------------------------------------")
+            for j in range(len(y)):
+                print("\n\nRámec: " + str(y[j].id))
+                print("Dĺžka rámca poskytnutá pcap API: " + str(len(y[j].data) / 2)[:-2] + "B")
+                if len(y[j].data) / 2 + 4 > 64:
+                    print("Dĺžka rámca prenášaného po médiu: " + str(len(y[j].data) / 2 + 4)[:-2] + "B")
+                else:
+                    print("Dĺžka rámca prenášaného po médiu: 64B")
+                print_mac(y[j].data)
+                print_ip2(y[j].ipsrc, y[j].ipdest)
+                print(y[j].protocol)
+                print("Zdrojový port: " + str(int(hexlify(y[j].portsrc), 16)))
+                print("Cielový port: " + str(int(hexlify(y[j].portdst), 16)))
+                print_packet(y[j].data)
+            print("\n------------------------------------------------------------")
 
 def main():
     print()
@@ -344,10 +588,12 @@ def main():
         if d == "f":
             fileout = open('out.txt', 'w')
             sys.stdout = fileout
-            printother(file, ramec)
+            if ramec == "http" or ramec == "https" or ramec == "telnet" or ramec == "ssh" or ramec == "ftpr" or ramec == "ftpd":
+                printTCP(file, ramec)
             fileout.close()
         elif d == "c":
-            printother(file, ramec)
+            if ramec == "http" or ramec == "https" or ramec == "telnet" or ramec == "ssh" or ramec == "ftpr" or ramec == "ftpd":
+                printTCP(file, ramec)
 
 
 main()
