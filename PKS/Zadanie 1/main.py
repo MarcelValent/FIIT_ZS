@@ -1,3 +1,4 @@
+from itertools import chain
 from scapy.all import *
 from binascii import hexlify, unhexlify
 
@@ -32,9 +33,9 @@ def print_packet(packet_data, spojovnik=0):
             if pocet % 8 == 0:
                 print("  ", end='')
         else:
+            pocet += 1
             if pocet % 6 != 0:
                 print('{:02X}'.format(i) + ":", end="")
-                pocet += 1
             else:
                 print('{:02X}'.format(i), end="")
                 break
@@ -95,8 +96,8 @@ def extract_data(packet_data, start, end, integ=False):
 
 
 def print_mac(riadok):
-    source_mac = extract_data(riadok, 0, 5)
-    receive_mac = extract_data(riadok, 6, 11)
+    receive_mac = extract_data(riadok, 0, 5)
+    source_mac = extract_data(riadok, 6, 11)
     print("Zdrojová MAC adresa: ", end="")
     print_packet(source_mac, 1)
     print("\nCieľová MAC adresa: ", end="")
@@ -586,6 +587,174 @@ def icmphandler(file):
                 print_packet(line, 0)
 
 
+def tftphandler(file):
+    ports = {}
+    count = 0
+    for l in range(len(file)):
+        line = bytes(file[l])
+        ether = extract_data(line, 12, 13)
+        ether = int(hexlify(ether), 16)
+        ip_header = extract_data(line, 23, 23, True)
+        if ip_header == 17 and ether == 2048:
+            load_from_file("udp_ports.txt", ports)
+            help = extract_data(transport_protocol(line), 0, 1, True)
+            help2 = extract_data(transport_protocol(line), 2, 3, True)
+            if help in ports:
+                x = ports.get(help)
+            elif help2 in ports:
+                x = ports.get(help2)
+            if x == "TFTP":
+                if help == 69 or help2 == 69:
+                    count += 1
+                    print("\n--------------------------------------------")
+                    print("Komunikácia číslo: " + str(count))
+                    sour = extract_data(line, 26, 29)
+                    dest = extract_data(line, 30, 33)
+                    print("\n\nRámec číslo: " + str(l + 1))
+                    print("Dĺžka rámca poskytnutá pcap API: " + str(len(line) / 2)[:-2] + "B")
+                    if len(line) / 2 + 4 > 64:
+                        print("Dĺžka rámca prenášaného po médiu: " + str(len(line) / 2 + 4)[:-2] + "B")
+                    else:
+                        print("Dĺžka rámca prenášaného po médiu: 64B")
+                    print("Ethernet II")
+                    print_mac(line)
+                    print("\nIPv4", end="")
+                    print_ip2(sour, dest)
+                    print("TFTP")
+                    print("Zdrojový port: ", end="")
+                    print(help)
+                    print("Cieľový port: ", end="")
+                    print(help2)
+                    print_packet(line, 0)
+                else:
+                    sour = extract_data(line, 26, 29)
+                    dest = extract_data(line, 30, 33)
+                    print("\n\nRámec číslo: " + str(l + 1))
+                    print("Dĺžka rámca poskytnutá pcap API: " + str(len(line) / 2)[:-2] + "B")
+                    if len(line) / 2 + 4 > 64:
+                        print("Dĺžka rámca prenášaného po médiu: " + str(len(line) / 2 + 4)[:-2] + "B")
+                    else:
+                        print("Dĺžka rámca prenášaného po médiu: 64B")
+                    print("Ethernet II")
+                    print_mac(line)
+                    print("\nIPv4", end="")
+                    print_ip2(sour, dest)
+                    print("TFTP")
+                    print("Zdrojový port: ", end="")
+                    print(help)
+                    print("Cieľový port: ", end="")
+                    print(help2)
+                    print_packet(line, 0)
+
+
+def arphandler(file):
+    arpcomplet = []
+    arpincomplet = []
+    tmp = []
+    for i in range(len(file)):
+        line = bytes(file[i])
+        if line not in chain(*arpcomplet):
+            ether = extract_data(line, 12, 13)
+            ether = int(hexlify(ether), 16)
+            if ether == 2054 and extract_data(line, 20, 21, True) == 1:
+                tmp.append(i+1)
+                tmp.append(line)
+                sour_ip = extract_data(line, 28, 31)
+                dest_ip = extract_data(line, 38, 41)
+                source_mac = extract_data(line, 6, 11)
+                for x in range(i+1, len(file)):
+                    line = bytes(file[x])
+                    if extract_data(line, 28, 31) == dest_ip and sour_ip == extract_data(line, 38, 41) and source_mac == extract_data(line, 0, 5) and extract_data(line, 20, 21, True) == 2:
+                        tmp.append(x+1)
+                        tmp.append(line)
+                        arpcomplet.append(copy.deepcopy(tmp))
+                        tmp.clear()
+                        break
+                    elif extract_data(line, 26, 29) == sour_ip and dest_ip == extract_data(line, 30, 33) and source_mac == extract_data(line, 6, 11) and extract_data(line, 20, 21, True) != 2 and x == len(file):
+                        tmp.append(x+1)
+                        arpincomplet.append(copy.deepcopy(tmp))
+                        tmp.clear()
+                        break
+                    elif extract_data(line, 28, 31) == sour_ip and dest_ip == extract_data(line, 38, 41) and source_mac == extract_data(line, 6, 11) and extract_data(line, 20, 21, True) == 1:
+                        tmp.append(x+1)
+                        tmp.append(line)
+                        arpincomplet.append(copy.deepcopy(tmp))
+                        tmp.clear()
+                    elif x == len(file):
+                        arpcomplet.clear()
+            elif ether == 2054 and extract_data(line, 20, 21, True) == 2:
+                tmp.append(i+1)
+                tmp.append(line)
+                arpincomplet.append(copy.deepcopy(tmp))
+            tmp.clear()
+        else:
+            continue
+
+    arpincomplet2 = []
+    for elem in arpincomplet:
+        if elem not in arpincomplet2:
+            arpincomplet2.append(elem)
+    arpincomplet = arpincomplet2
+
+    if len(arpcomplet) > 0:
+        for l in range(len(arpcomplet)):
+            print("\n--------------------------------------------")
+            print("Komunikácia číslo: " + str(l+1))
+            x = arpcomplet[l]
+            for i in range(0, len(x), 2):
+                if i == len(x)-2:
+                    print("\n\nARP - Reply")
+
+                else:
+                    print("\n\nARP - Request")
+                sour = extract_data(x[i+1], 28, 31)
+                dest = extract_data(x[i+1], 38, 41)
+                print("Rámec číslo: " + str(x[i]))
+                print("Dĺžka rámca poskytnutá pcap API: " + str(len(x[i+1]) / 2)[:-2] + "B")
+                if len(x[i+1]) / 2 + 4 > 64:
+                    print("Dĺžka rámca prenášaného po médiu: " + str(len(x[i+1]) / 2 + 4)[:-2] + "B")
+                else:
+                    print("Dĺžka rámca prenášaného po médiu: 64B")
+                print("Ethernet II")
+                print_mac(x[i+1])
+                print("\nIPv4", end="")
+                print_ip2(sour, dest)
+                print("ARP")
+                print_packet(x[i+1], 0)
+
+    print("\n\n Nekompletné ARP komunikácie:")
+    print("========================================================")
+    if len(arpincomplet) > 0:
+        helpik = []
+        for l in range(len(arpincomplet)):
+            x = arpincomplet[l]
+            for i in range(0, len(x), 2):
+                if x[i] not in helpik:
+                    helpik.append(x[i])
+                    if extract_data(x[i+1], 20, 21, True) == 2:
+                        print("\n\nARP - Reply")
+
+                    if extract_data(x[i+1], 20, 21, True) == 1:
+                        print("\n\nARP - Request")
+
+                    sour = extract_data(x[i+1], 28, 31)
+                    dest = extract_data(x[i+1], 38, 41)
+                    print("Rámec číslo: " + str(x[i]))
+                    print("Dĺžka rámca poskytnutá pcap API: " + str(len(x[i+1]) / 2)[:-2] + "B")
+                    if len(x[i+1]) / 2 + 4 > 64:
+                        print("Dĺžka rámca prenášaného po médiu: " + str(len(x[i+1]) / 2 + 4)[:-2] + "B")
+                    else:
+                        print("Dĺžka rámca prenášaného po médiu: 64B")
+                    print("Ethernet II")
+                    print_mac(x[i+1])
+                    print("\nIPv4", end="")
+                    print_ip2(sour, dest)
+                    print("ARP")
+                    print_packet(x[i+1], 0)
+
+
+
+
 def main():
     print()
     print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
@@ -633,12 +802,19 @@ def main():
                 printTCP(file, ramec)
             elif ramec == "icmp":
                 icmphandler(file)
+            elif ramec == "tftp":
+                tftphandler(file)
+            elif ramec == "arp":
+                arphandler(file)
             fileout.close()
         elif d == "c":
             if ramec == "http" or ramec == "https" or ramec == "telnet" or ramec == "ssh" or ramec == "ftpr" or ramec == "ftpd":
                 printTCP(file, ramec)
             elif ramec == "icmp":
                 icmphandler(file)
-
+            elif ramec == "tftp":
+                tftphandler(file)
+            elif ramec == "arp":
+                arphandler(file)
 
 main()
