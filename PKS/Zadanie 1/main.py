@@ -21,7 +21,7 @@ class communication:
 
 
 def print_packet(packet_data, spojovnik=0):
-    pocet = 1
+    pocet = 0
     for i in packet_data:
         if spojovnik == 0:
             pocet += 1
@@ -349,12 +349,13 @@ def comanalysis(arr):
 
     return "False"
 
+
 def incomplete(arr):
     incompletecomm = []
     for i in range(len(arr)):
         tupec = False
         if arr[i].syn == True:
-            if len(incompletecomm) >=1:
+            if len(incompletecomm) >=3:
                 return incompletecomm
             last_dest = arr[i].ipdest
             last_src = arr[i].ipsrc
@@ -457,7 +458,9 @@ def printTCP(file, typeofframe):
                     print("Dĺžka rámca prenášaného po médiu: " + str(len(x[o].data) / 2 + 4)[:-2] + "B")
                 else:
                     print("Dĺžka rámca prenášaného po médiu: 64B")
+                print("Ethernet II")
                 print_mac(x[o].data)
+                print("IPv4")
                 print_ip2(x[o].ipsrc, x[o].ipdest)
                 print(x[o].protocol)
                 print("Zdrojový port: " + str(int(hexlify(x[o].portsrc), 16)))
@@ -470,7 +473,9 @@ def printTCP(file, typeofframe):
                     print("Dĺžka rámca prenášaného po médiu: " + str(len(x[p].data) / 2 + 4)[:-2] + "B")
                 else:
                     print("Dĺžka rámca prenášaného po médiu: 64B")
+                print("Ethernet II")
                 print_mac(x[p].data)
+                print("IPv4")
                 print_ip2(x[p].ipsrc, x[p].ipdest)
                 print(x[p].protocol)
                 print("Zdrojový port: " + str(int(hexlify(x[p].portsrc), 16)))
@@ -487,14 +492,16 @@ def printTCP(file, typeofframe):
                     print("Dĺžka rámca prenášaného po médiu: " + str(len(x[i].data) / 2 + 4)[:-2] + "B")
                 else:
                     print("Dĺžka rámca prenášaného po médiu: 64B")
+                print("Ethernet II")
                 print_mac(x[i].data)
+                print("IPv4")
                 print_ip2(x[i].ipsrc, x[i].ipdest)
                 print(x[i].protocol)
                 print("Zdrojový port: " + str(int(hexlify(x[i].portsrc), 16)))
                 print("Cielový port: " + str(int(hexlify(x[i].portdst), 16)))
                 print_packet(x[i].data)
             print("\n------------------------------------------------------------")
-    if len(y) == 0:
+    if len(y) < 3:
         print("Vzorka neobsahuje správne začatú a nesprávne ukončenú komunikáciu.")
     else:
         if len(y) >= 20:
@@ -507,7 +514,9 @@ def printTCP(file, typeofframe):
                     print("Dĺžka rámca prenášaného po médiu: " + str(len(y[a].data) / 2 + 4)[:-2] + "B")
                 else:
                     print("Dĺžka rámca prenášaného po médiu: 64B")
+                print("Ethernet II")
                 print_mac(y[a].data)
+                print("IPv4")
                 print_ip2(y[a].ipsrc, y[a].ipdest)
                 print(y[a].protocol)
                 print("Zdrojový port: " + str(int(hexlify(y[a].portsrc), 16)))
@@ -520,7 +529,9 @@ def printTCP(file, typeofframe):
                     print("Dĺžka rámca prenášaného po médiu: " + str(len(y[b].data) / 2 + 4)[:-2] + "B")
                 else:
                     print("Dĺžka rámca prenášaného po médiu: 64B")
+                print("Ethernet II")
                 print_mac(y[b].data)
+                print("IPv4")
                 print_ip2(y[b].ipsrc, y[b].ipdest)
                 print(y[b].protocol)
                 print("Zdrojový port: " + str(int(hexlify(y[b].portsrc), 16)))
@@ -537,13 +548,43 @@ def printTCP(file, typeofframe):
                     print("Dĺžka rámca prenášaného po médiu: " + str(len(y[j].data) / 2 + 4)[:-2] + "B")
                 else:
                     print("Dĺžka rámca prenášaného po médiu: 64B")
+                print("Ethernet II")
                 print_mac(y[j].data)
+                print("IPv4")
                 print_ip2(y[j].ipsrc, y[j].ipdest)
                 print(y[j].protocol)
                 print("Zdrojový port: " + str(int(hexlify(y[j].portsrc), 16)))
                 print("Cielový port: " + str(int(hexlify(y[j].portdst), 16)))
                 print_packet(y[j].data)
             print("\n------------------------------------------------------------")
+
+
+def icmphandler(file):
+    icmp = {}
+    load_from_file("icmp_types.txt", icmp)
+    for i in range(len(file)):
+        line = bytes(file[i])
+        ether = extract_data(line, 12, 13)
+        ether = int(hexlify(ether), 16)
+        ip_header = extract_data(line, 23, 23, True)
+        if ip_header == 1 and ether == 2048:
+            if extract_data(transport_protocol(line), 0, 0, True) in icmp:
+                sour = extract_data(line, 26, 29)
+                dest = extract_data(line, 30, 33)
+                print("\n\nRámec číslo: " + str(i+1))
+                print("Dĺžka rámca poskytnutá pcap API: " + str(len(line) / 2)[:-2] + "B")
+                if len(line) / 2 + 4 > 64:
+                    print("Dĺžka rámca prenášaného po médiu: " + str(len(line) / 2 + 4)[:-2] + "B")
+                else:
+                    print("Dĺžka rámca prenášaného po médiu: 64B")
+                print("Ethernet II")
+                print_mac(line)
+                print("\nIPv4", end="")
+                print_ip2(sour, dest)
+                print("\nSpráva: ", end="")
+                print(icmp.get(extract_data(transport_protocol(line), 0, 0, True)))
+                print_packet(line, 0)
+
 
 def main():
     print()
@@ -590,10 +631,14 @@ def main():
             sys.stdout = fileout
             if ramec == "http" or ramec == "https" or ramec == "telnet" or ramec == "ssh" or ramec == "ftpr" or ramec == "ftpd":
                 printTCP(file, ramec)
+            elif ramec == "icmp":
+                icmphandler(file)
             fileout.close()
         elif d == "c":
             if ramec == "http" or ramec == "https" or ramec == "telnet" or ramec == "ssh" or ramec == "ftpr" or ramec == "ftpd":
                 printTCP(file, ramec)
+            elif ramec == "icmp":
+                icmphandler(file)
 
 
 main()
