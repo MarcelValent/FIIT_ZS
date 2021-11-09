@@ -4,7 +4,7 @@ from binascii import hexlify, unhexlify
 
 encoding = "UTF-8"
 
-
+#class pre jednotlivé rámce komunikácie
 class communication:
     def __init__(self, data, ipsrc, ipdest, portsrc, portdst, protocol, id, ack, syn, reset, push, fin):
         self.data = data
@@ -20,7 +20,7 @@ class communication:
         self.push = push
         self.fin = fin
 
-
+#funkcia na print dát rámca v peknej forme
 def print_packet(packet_data, spojovnik=0):
     pocet = 0
     for i in packet_data:
@@ -40,7 +40,7 @@ def print_packet(packet_data, spojovnik=0):
                 print('{:02X}'.format(i), end="")
                 break
 
-
+#funkcia na print čísel
 def print_int(packet_data, spojovnik=""):
     l = 0
     for i in packet_data:
@@ -50,7 +50,7 @@ def print_int(packet_data, spojovnik=""):
         else:
             print(str(i) + spojovnik, end='')
 
-
+#funkcia ktorá obsahuje body 1-3
 def print_info(file):
     global riadok
     ip_nodes = {}
@@ -75,7 +75,7 @@ def print_info(file):
         ipv4_handler(riadok, ip_nodes)
     ipv4_printer(ip_nodes)
 
-
+#funkcia na zistenie a print typu rámca
 def print_type(ether, ieee):
     print("\nTyp rámca: ", end='')
     if ether >= 1536:
@@ -87,14 +87,14 @@ def print_type(ether, ieee):
     else:
         print("IEEE 802.3 LLC")
 
-
+#funkcia na získanie dát z rámca
 def extract_data(packet_data, start, end, integ=False):
     if integ:
         return int(hexlify(packet_data[start:(end + 1)]), 16)
     else:
         return packet_data[start:(end + 1)]
 
-
+#funkcia na zistenie a print mac adries
 def print_mac(riadok):
     receive_mac = extract_data(riadok, 0, 5)
     source_mac = extract_data(riadok, 6, 11)
@@ -103,13 +103,13 @@ def print_mac(riadok):
     print("\nCieľová MAC adresa: ", end="")
     print_packet(receive_mac, 1)
 
-
+#funkcia na načítanie dát zo súboru
 def load_from_file(file_name, dictionary):
     for line in open(file_name, "r"):
         processed = line.split(' ', 1)
         dictionary[int(processed[0], 16)] = processed[1].replace("\n", "")
 
-
+#funkcia na zistenie a print IP adries
 def print_ip(sour_start, sour_end, dest_start, dest_end):
     count = 0
     source = extract_data(riadok, sour_start, sour_end)
@@ -131,7 +131,7 @@ def print_ip(sour_start, sour_end, dest_start, dest_end):
         else:
             print(str(l) + ".", end='')
 
-
+#funkcia na print ip adries v 4ke
 def print_ip2(src, dest):
     count = 0
     print("\nZdrojová IP adresa: ", end='')
@@ -151,12 +151,12 @@ def print_ip2(src, dest):
         else:
             print(str(l) + ".", end='')
 
-
+#funkcia na odstránenie IP hlavičky
 def transport_protocol(help):
     head = (extract_data(help, 14, 14, True) - int(extract_data(help, 14, 14, True) / 16) * 16) * 4
     return help[14 + head:len(help)]
 
-
+#funkcia na zistenie vnorených protokolov
 def inside_protocol(riadok, ether, ieee):
     print("Typ vnoreného protokolu: ", end='')
     ether_type = {}
@@ -216,7 +216,7 @@ def inside_protocol(riadok, ether, ieee):
     elif ieee == 65535:
         print("IPX")
 
-
+#funkcia na zistenie IP adries uzlov
 def ipv4_handler(data, dict):
 
     if extract_data(data, 12, 13, True) == 2048:
@@ -227,18 +227,18 @@ def ipv4_handler(data, dict):
             dict[source_ip] = 1
     return dict
 
-
+#funkcia na print dát z predchádzajúcej funkcie
 def ipv4_printer(ipnodes):
     print("\nZoznam odosielajúcich IP: ")
 
     for l in ipnodes:
         print_int(l , ".")
         print()
-    print("Adresa uzla s najvyšším počtom prijatých IPV4 packetov: ", end="")
+    print("Adresa uzla s najvyšším počtom odoslaných IPV4 packetov: ", end="")
     print_int(max(ipnodes, key=lambda k: ipnodes[k]), ".")
-    print(" prijala spolu", ipnodes.get(max(ipnodes, key=lambda k: ipnodes[k])), "paketov")
+    print(" odoslala spolu", ipnodes.get(max(ipnodes, key=lambda k: ipnodes[k])), "paketov")
 
-
+#funkcia na kontrolu či je TCP
 def checker(riadok, ether):
     ports = {}
     ip_header = extract_data(riadok, 23, 23, True)
@@ -256,7 +256,7 @@ def checker(riadok, ether):
     else:
         return False
 
-
+#funkcia na pridanie komunikacie do zoznamu
 def tcp_check(arr, riadok, ether, typeofframe, number):
     ports = {}
     load_from_file("tcp_ports.txt", ports)
@@ -270,7 +270,7 @@ def tcp_check(arr, riadok, ether, typeofframe, number):
     else:
         return False
 
-
+#analyzovanie flagov TCP komunikacii
 def flaganalyzator(arr):
     for i in range(len(arr)):
         bin(extract_data(transport_protocol(arr[i].data), 13, 13, True))
@@ -290,7 +290,7 @@ def flaganalyzator(arr):
             arr[i].fin = True
     return arr
 
-
+#najdenie kompletnej komunikacie
 def comanalysis(arr):
     finalcomm = []
     for i in range(len(arr)):
@@ -350,7 +350,7 @@ def comanalysis(arr):
 
     return "False"
 
-
+#najdenie nekompletnej komunikacie
 def incomplete(arr):
     incompletecomm = []
     for i in range(len(arr)):
@@ -420,7 +420,7 @@ def incomplete(arr):
             continue
     return incompletecomm
 
-
+#funkcia na print komplet a nekomplet TCP komunikacii
 def printTCP(file, typeofframe):
     global riadok
     tcp = []
@@ -559,7 +559,7 @@ def printTCP(file, typeofframe):
                 print_packet(y[j].data)
             print("\n------------------------------------------------------------")
 
-
+#funkcia pre ICMP zo 4ky
 def icmphandler(file):
     icmp = {}
     load_from_file("icmp_types.txt", icmp)
@@ -586,7 +586,7 @@ def icmphandler(file):
                 print(icmp.get(extract_data(transport_protocol(line), 0, 0, True)))
                 print_packet(line, 0)
 
-
+#funkcia pre tftp zo 4ky
 def tftphandler(file):
     ports = {}
     count = 0
@@ -646,7 +646,7 @@ def tftphandler(file):
                     print(help2)
                     print_packet(line, 0)
 
-
+#funkcia pre ARP zo 4ky
 def arphandler(file):
     arpcomplet = []
     arpincomplet = []
@@ -686,16 +686,9 @@ def arphandler(file):
                 tmp.append(i+1)
                 tmp.append(line)
                 arpincomplet.append(copy.deepcopy(tmp))
-            tmp.clear()
+                tmp.clear()
         else:
             continue
-
-    arpincomplet2 = []
-    for elem in arpincomplet:
-        if elem not in arpincomplet2:
-            arpincomplet2.append(elem)
-    arpincomplet = arpincomplet2
-
     if len(arpcomplet) > 0:
         for l in range(len(arpcomplet)):
             print("\n--------------------------------------------")
@@ -752,9 +745,37 @@ def arphandler(file):
                     print("ARP")
                     print_packet(x[i+1], 0)
 
+#doimplementacia
+def pimhandler(file):
+    ip = {}
+    count = 0
+    load_from_file("ip_protocols.txt", ip)
+    for i in range(len(file)):
+        line = bytes(file[i])
+        ether = extract_data(line, 12, 13)
+        ether = int(hexlify(ether), 16)
+        ip_header = extract_data(line, 23, 23, True)
+        if ip_header in ip:
+            x = ip.get(ip_header)
+            if x == "PIM":
+                count += 1
+                sour = extract_data(line, 26, 29)
+                dest = extract_data(line, 30, 33)
+                print("\n\nRámec číslo: " + str(i + 1))
+                print("Dĺžka rámca poskytnutá pcap API: " + str(len(line) / 2)[:-2] + "B")
+                if len(line) / 2 + 4 > 64:
+                    print("Dĺžka rámca prenášaného po médiu: " + str(len(line) / 2 + 4)[:-2] + "B")
+                else:
+                    print("Dĺžka rámca prenášaného po médiu: 64B")
+                print("Ethernet II")
+                print_mac(line)
+                print("\nIPv4", end="")
+                print_ip2(sour, dest)
+                print("PIM")
+                print_packet(line, 0)
+    print ("\n\nPočet PIM: " + str(count))
 
-
-
+#main+GUI+spustanie jednotlivych funkcii
 def main():
     print()
     print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
@@ -790,6 +811,7 @@ def main():
         print("     tftp - pre výpis TFTP rámcov")
         print("     icmp - pre výpis ICMP rámcov")
         print("     arp - pre výpis ARP rámcov")
+        print("     pim - pre výpis PIM rámcov")
         print("Zvoľ si: ", end="")
         ramec = input().lower()
         print("Chceš výstup do súboru alebo console? \n     c - console\n     f - file")
@@ -806,6 +828,8 @@ def main():
                 tftphandler(file)
             elif ramec == "arp":
                 arphandler(file)
+            elif ramec == "pim":
+                pimhandler(file)
             fileout.close()
         elif d == "c":
             if ramec == "http" or ramec == "https" or ramec == "telnet" or ramec == "ssh" or ramec == "ftpr" or ramec == "ftpd":
@@ -816,5 +840,8 @@ def main():
                 tftphandler(file)
             elif ramec == "arp":
                 arphandler(file)
+            elif ramec == "pim":
+                pimhandler(file)
+
 
 main()
