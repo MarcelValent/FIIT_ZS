@@ -1,3 +1,4 @@
+import copy
 import random
 
 
@@ -8,106 +9,29 @@ class Garden:
         for x in range(rows+1):
             self.row = []
             for y in range(columns):
-                z = random.random()
-                if z < 0.05:
-                    self.row.append("K")
-                else:
-                    self.row.append(0)
+                self.row.append(0)
             self.garden.append(self.row)
         self.row.clear()
         self.garden.remove(self.garden[rows])
-        self.raked = 0
         self.row = rows
         self.column = columns
         self.size = rows*columns
-        self.rocks = sum(row.count("K") for row in self.garden)
 
 
-def move_up(garden, x, y, actually=False):
-    if actually:
-        tempx = x - 1
-        tempy = y
-        if tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == 0 :
-            return tempx, tempy
-        elif tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == "K":
-            return "Kamen"
-        elif tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] != "K" and tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] != "0":
-            return 1
-        else: return False
-    else:
-        tempx = x - 1
-        tempy = y
-        if tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == 0:
-            return True
-        elif tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == "K":
-            return "Kamen"
-        else: return False
+class Monk:
+    def __init__(self, garden, moves):
+        self.garden = garden
+        self.moves = moves
+        self.fitness = 0
 
 
-def move_down(garden, x, y, actually=False):
-    if actually:
-        tempx = x + 1
-        tempy = y
-        if tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == 0:
-           return tempx, tempy
-        elif tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == "K":
-            return "Kamen"
-        elif tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] != "K" and tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] != "0":
-            return 1
-        else:
-            return False
-    else:
-        tempx = x+1
-        tempy = y
-        if tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == 0:
-            return True
-        elif tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == "K":
-            return "Kamen"
-        else: return False
-
-
-def move_left(garden, x, y, actually=False):
-    if actually:
-        tempx = x
-        tempy = y - 1
-        if tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == 0:
-            return tempx, tempy
-        elif tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == "K":
-            return "Kamen"
-        elif tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] != "K" and tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] != "0":
-            return 1
-        else:
-            return False
-    else:
-        tempx = x
-        tempy = y-1
-        if tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == 0:
-            return True
-        elif tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == "K":
-            return "Kamen"
-        else: return False
-
-
-def move_right(garden, x, y, actually=False):
-    if actually:
-        tempx = x
-        tempy = y + 1
-        if tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == 0:
-            return tempx,tempy
-        elif tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == "K":
-            return "Kamen"
-        elif tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] != "K" and tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] != "0":
-            return 1
-        else:
-            return False
-    else:
-        tempx = x
-        tempy = y+1
-        if tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == 0:
-            return True
-        elif tempx > -1 and tempy > -1 and tempx < garden.row and tempy < garden.column and garden.garden[tempx][tempy] == "K":
-            return "Kamen"
-        else: return False
+def calculate_fitness(zahrada):
+    tmp = 0
+    for x in range(zahrada.row):
+        for y in range(zahrada.column):
+            if zahrada.garden[x][y] != 0 and zahrada.garden[x][y] != "K":
+                tmp += 1
+    return tmp
 
 
 def print_garden(garden):
@@ -120,387 +44,191 @@ def print_garden(garden):
 
 def generate_start(x, y):
     global start_sur
-    start_sur = [[]]
+    start_sur = []
     for l in range(x):
-        if [l, 0] not in start_sur:
-            start_sur.append([l, 0])
-    for k in range (y):
-        if [0, k] not in start_sur:
-            start_sur.append([0, k])
+        start_sur.append([l, 0, "r"])
+    for k in range(y):
+        start_sur.append([0, k, "d"])
     for m in range(x):
-        if [m, y-1] not in start_sur:
-            start_sur.append([m, y-1])
-    for n in range (y):
-        if [x-1, n] not in start_sur:
-            start_sur.append([x-1, n])
-    del start_sur[0]
+        start_sur.append([m, y-1, "l"])
+    for n in range(y):
+        start_sur.append([x-1, n, "u"])
     return start_sur
 
 
-def rake(garden, sur):
-    number = 1
-    for k in range(99):
-        x = len(sur)-1
-        x = random.randint(0, x)
-        start_monk = sur[x]
-        z = random.randint(0, 1)
-        if garden.garden[start_monk[0]][start_monk[1]] != 0:
-            sur.remove(sur[x])
-            continue
-        elif start_monk[1] == (garden.row - 1) and start_monk[0] == 0:
-            if z == 0:
-                move = move_down(garden, start_monk[0], start_monk[1])
-                direction = "d"
-                if move == True:
-                    move = move_down(garden, start_monk[0], start_monk[1], True)
-            elif z == 1:
-                move = move_left(garden, start_monk[0], start_monk[1])
-                direction = "l"
-                if move == True:
-                    move = move_left(garden, start_monk[0], start_monk[1], True)
-        elif start_monk[1] == (garden.row - 1) and start_monk[0] == (garden.row - 1):
-            if z == 0:
-                move = move_up(garden, start_monk[0], start_monk[1])
-                direction = "u"
-                if move == True:
-                    move = move_up(garden, start_monk[0], start_monk[1], True)
-            if z == 1:
-                move = move_left(garden, start_monk[0], start_monk[1])
-                direction = "l"
-                if move == True:
-                    move = move_left(garden, start_monk[0], start_monk[1], True)
-        elif start_monk[0] == 0 and start_monk[1] == 0:
-            if z == 0:
-                move = move_down(garden, start_monk[0], start_monk[1])
-                direction = "d"
-                if move == True:
-                    move = move_down(garden, start_monk[0], start_monk[1], True)
-            if z == 1:
-                move = move_right(garden, start_monk[0], start_monk[1])
-                direction = "r"
-                if move == True:
-                    move = move_right(garden, start_monk[0], start_monk[1], True)
-        elif start_monk[0] == (garden.row - 1) and start_monk[1] == 0:
-            if z == 0:
-                move = move_up(garden, start_monk[0], start_monk[1])
-                direction = "u"
-                if move == True:
-                    move = move_up(garden, start_monk[0], start_monk[1], True)
-            if z == 1:
-                move = move_right(garden, start_monk[0], start_monk[1])
-                direction = "r"
-                if move == True:
-                    move = move_right(garden, start_monk[0], start_monk[1], True)
-        elif start_monk[0] == 0:
-            direction = "d"
-            move = move_down(garden, start_monk[0], start_monk[1], True)
-        elif start_monk[1] == garden.row - 1:
-            direction = "l"
-            move = move_left(garden, start_monk[0], start_monk[1], True)
-        elif start_monk[0] == garden.row - 1:
-            direction = "u"
-            move = move_up(garden, start_monk[0], start_monk[1], True)
-        elif start_monk[1] == 0:
-            direction = "r"
-            move = move_right(garden, start_monk[0], start_monk[1], True)
+def randomKamen(number,  zahrada):
+    for x in range(zahrada.row):
+        for i in range(zahrada.column):
+            z = random.random()
+            if z < number:
+                zahrada.garden[x][i] = "K"
 
 
-
-        if move == "Kamen":
-            continue
-        if move == 1:
-            continue
-
-        garden.garden[start_monk[0]][start_monk[1]] = number
-        while move != False:
-            temp = move
-            if move != "Kamen"and move!= 1 and move != False:
-                garden.garden[move[0]][move[1]] = number
-                temp = move
-            if direction == "r":
-                move = move_right(garden,move[0], move[1], True)
-                if move != False and move != "Kamen"and move!= 1:
-                    garden.garden[move[0]][move[1]] = number
-                    temp = move
-                elif move == "Kamen":
-                    if move_up(garden,temp[0], temp[1]):
-                        move = move_up(garden, temp[0], temp[1], True)
-                        garden.garden[move[0]][move[1]] = number
-                        temp = move
-                        direction = "u"
-                    elif move_down(garden,temp[0], temp[1]):
-                        move = move_down(garden, temp[0], temp[1], True)
-                        garden.garden[move[0]][move[1]] = number
-                        temp = move
-                        direction = "d"
-                elif move == 1:
-                    if z == 1:
-                        if move_up(garden, temp[0], temp[1], True) != 1 and move_up(garden, temp[0], temp[1], True) != "Kamen"  and move_up(garden, temp[0], temp[1], True) != False:
-                            move =move_up(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "u"
-                        else:
-                            move = move_down(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "d"
-                    elif z == 0:
-                        if move_down(garden, temp[0], temp[1], True) != 1 and move_down(garden, temp[0], temp[1], True) != "Kamen" and move_down(garden, temp[0], temp[1], True) != False:
-                            move = move_down(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "d"
-                        else:
-                            move = move_up(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "u"
-                    else:
-                        return 0
+def zadajKamen(zahrada, listik):
+    for i in range(len(listik)):
+        zahrada.garden[listik[i][0]][listik[i][1]] = "K"
 
 
-
-
-            if direction == "l":
-                move = move_left(garden,move[0], move[1], True)
-                if move != False and move != "Kamen"and move!= 1:
-                    garden.garden[move[0]][move[1]] = number
-                    temp = move
-                elif move == "Kamen":
-                    if move_up(garden,temp[0], temp[1]):
-                        move = move_up(garden, temp[0], temp[1], True)
-                        if move == 1 or move == False or move == "Kamen":
-                            print("A SI DOHRABAL KAMARADE")
-                        else:
-                            garden.garden[move[0]][move[1]] = number
-                            temp = move
-                            direction = "u"
-                    elif move_down(garden,temp[0], temp[1]):
-                        move = move_down(garden, temp[0], temp[1], True)
-                        if move == 1 or move == False or move == "Kamen":
-                            print("A SI DOHRABAL KAMARADE")
-                        else:
-                            garden.garden[move[0]][move[1]] = number
-                            temp = move
-                            direction = "d"
-                elif move == 1:
-                    if z == 1:
-                        if move_up(garden, temp[0], temp[1], True) != 1 and move_up(garden, temp[0], temp[1],
-                                                                                   True) != "Kamen" and move_up(garden, temp[0], temp[1], True) != False:
-                            move = move_up(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "u"
-                        else:
-                            move = move_down(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "d"
-                    elif z == 0:
-                        if move_down(garden, temp[0], temp[1], True) != 1 and move_down(garden, temp[0], temp[1],
-                                                                                       True) != "Kamen"and move_down(garden, temp[0], temp[1], True) != False:
-                            move = move_down(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "d"
-                        else:
-                            move = move_up(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "u"
-                    else:
-                        return 0
-
-
-
-
-
-
-            if direction == "u":
-                move = move_up(garden,move[0], move[1], True)
-                if move != False and move != "Kamen"and move!= 1:
-                    garden.garden[move[0]][move[1]] = number
-                    temp = move
-                elif move == "Kamen":
-                    if move_left(garden,temp[0], temp[1]):
-                        move = move_left(garden, temp[0], temp[1], True)
-                        if move == 1 or move == False or move == "Kamen":
-                            print("A SI DOHRABAL KAMARADE")
-                        else:
-                            garden.garden[move[0]][move[1]] = number
-                            temp = move
-                            direction = "l"
-                    elif move_right(garden,temp[0], temp[1]):
-                        move = move_right(garden, temp[0], temp[1], True)
-                        if move == 1 or move == False or move == "Kamen":
-                            print("A SI DOHRABAL KAMARADE")
-                        else:
-                            garden.garden[move[0]][move[1]] = number
-                            temp = move
-                            direction = "r"
-                elif move == 1:
-                    if z == 1:
-                        if move_right(garden, temp[0], temp[1], True) != 1 and move_right(garden, temp[0], temp[1],
-                                                                                         True) != "Kamen" and move_right(garden, temp[0], temp[1], True) != False:
-                            move = move_right(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "r"
-                        else:
-                            move = move_left(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "l"
-                    elif z == 0:
-                        if move_left(garden, temp[0], temp[1], True) != 1 and move_left(garden, temp[0], temp[1],
-                                                                                       True) != "Kamen" and move_left(garden, temp[0], temp[1], True) != False:
-                            move = move_left(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "l"
-                        else:
-                            move = move_right(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "r"
-                    else:
-                        return 0
-
-
-
-
-
-
-
-            if direction == "d":
-                move = move_down(garden,move[0], move[1], True)
-                if move != False and move != "Kamen" and move!= 1:
-                    garden.garden[move[0]][move[1]] = number
-                    temp = move
-                elif move == "Kamen":
-                    if move_left(garden, temp[0], temp[1]):
-                        move = move_left(garden, temp[0], temp[1], True)
-                        if move == 1 or move == False or move == "Kamen":
-                            print("A SI DOHRABAL KAMARADE")
-                        else:
-                            garden.garden[move[0]][move[1]] = number
-                            temp = move
-                            direction = "l"
-                    elif move_right(garden, temp[0], temp[1]):
-                        move = move_right(garden, temp[0], temp[1], True)
-                        if move == 1 or move == False or move == "Kamen":
-                            print("A SI DOHRABAL KAMARADE")
-                        else:
-                            garden.garden[move[0]][move[1]] = number
-                            temp = move
-                            direction = "r"
-                elif move == 1:
-                    if z == 1:
-                        if move_right(garden, temp[0], temp[1], True) != 1 and move_right(garden, temp[0], temp[1],
-                                                                                         True) != "Kamen" and move_right(garden, temp[0], temp[1], True) != False:
-                            move = move_right(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "r"
-                        else:
-                            move = move_left(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "l"
-                    elif z == 0:
-                        if move_left(garden, temp[0], temp[1], True) != 1 and move_left(garden, temp[0], temp[1],
-                                                                                       True) != "Kamen" and move_left(garden, temp[0], temp[1], True) != False:
-                            move = move_left(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "l"
-                        else:
-                            move = move_right(garden, temp[0], temp[1], True)
-                            if move == 1 or move == False or move == "Kamen":
-                                print("A SI DOHRABAL KAMARADE")
-                            else:
-                                garden.garden[move[0]][move[1]] = number
-                                temp = move
-                                direction = "r"
-                    else:
-                        return 0
-            if (move == 1 or move == "Kamen") and (temp[0] != 0 or temp[0] != garden.column -1 or temp[1] != 0 or temp != garden.row -1):
-                if move_right(garden,temp[0],temp[1]) == True:
-                    move = move_right(garden,temp[0],temp[1], True)
-                    direction = "r"
-                if move_down(garden,temp[0],temp[1]) == True:
-                    move = move_down(garden,temp[0],temp[1], True)
-                    direction = "d"
-                if move_up(garden,temp[0],temp[1]) == True:
-                    move = move_up(garden,temp[0],temp[1], True)
-                    direction = "u"
-                if move_left(garden,temp[0],temp[1]) == True:
-                    move = move_left(garden,temp[0],temp[1], True)
-                    direction = "l"
-                garden.raked = (garden.size - sum(row.count(0) for row in garden.garden) - garden.rocks)
-                print("Stihol som pohrabat ", garden.raked, " štrku predtym jak som siel na pivko")
-                return 0
+def rake_help(zahrada, sur, number):
+    x = sur[0]
+    y = sur[1]
+    if zahrada.garden[x][y] == 0:
+        zahrada.garden[x][y] = number
+        direction = sur[2]
+    else:
+        return 1
+    while True:
+        if direction == "d":
+            if x + 1 < zahrada.row:
+                if zahrada.garden[x + 1][y] == 0:
+                    zahrada.garden[x + 1][y] = number
+                    x += 1
+                else:
+                    direction = check(x, y, zahrada, direction)
+                    if direction == False:
+                        return -1
             else:
-                continue
-        number += 1
-        sur.remove(sur[x])
-    garden.raked = (garden.size - sum(row.count(0) for row in garden.garden) - garden.rocks)
-    print("Stihol som pohrabat ", garden.raked, " štrku predtym jak som siel na pivko")
+                return 0
+        elif direction == "u":
+            if x - 1 >= 0:
+                if zahrada.garden[x - 1][y] == 0:
+                    zahrada.garden[x - 1][y] = number
+                    x -= 1
+                else:
+                    direction = check(x, y, zahrada, direction)
+                    if direction == False:
+                        return -1
+            else:
+                return 0
+        elif direction == "r":
+            if y + 1 < zahrada.column:
+                if zahrada.garden[x][y + 1] == 0:
+                    zahrada.garden[x][y + 1] = number
+                    y += 1
+                else:
+                    direction = check(x, y, zahrada, direction)
+                    if direction == False:
+                        return -1
+            else:
+                return 0
+        elif direction == "l":
+            if y - 1 >= 0:
+                if zahrada.garden[x][y - 1] == 0:
+                    zahrada.garden[x][y - 1] = number
+                    y -= 1
+                else:
+                    direction = check(x, y, zahrada, direction)
+                    if direction == False:
+                        return -1
+            else:
+                return 0
+
+
+def check(x, y, garden, direction):
+    moznosti = []
+    if direction == "l" or direction == "r":
+        if x + 1 < garden.row:
+            if garden.garden[x + 1][y] == 0:
+                moznosti.append("d")
+        else:
+            moznosti.append("d")
+        if x - 1 >= 0:
+            if garden.garden[x - 1][y] == 0:
+                moznosti.append("u")
+        else:
+            moznosti.append("u")
+    else:
+        if y + 1 < garden.column:
+            if garden.garden[x][y + 1] == 0:
+                moznosti.append("r")
+        else:
+            moznosti.append("r")
+        if y - 1 >= 0:
+            if garden.garden[x][y - 1] == 0:
+                moznosti.append("l")
+        else:
+            moznosti.append("l")
+    if len(moznosti) == 0:
+        return False
+    else:
+        return random.choice(moznosti)
+
+
+def rake(zahrada, sur):
+    number = 1
+    for x in range(len(sur)):
+        help = rake_help(zahrada, sur[x], number)
+        if help == -1:
+            for i in range(len(zahrada.garden)):
+                for j in range(len(zahrada.garden[i])):
+                    if zahrada.garden[i][j] == number:
+                        zahrada.garden[i][j] = 0
+            return -1
+        elif help == 0:
+            number += 1
+    return 2
+
+
+def monastery(monk, garden, fitness):
+    generations = 1000
+    monks = 100
+    tabu = []
+    tabusize = 50
+    head_monk = monk
+    for x in range(generations):
+        if x != 0:
+            monk = copy.deepcopy(best_monk)
+        best_monk = None
+        for y in range(monks):
+            garden_help = copy.deepcopy(garden)
+            index1 = random.randint(0, len(monk.moves) - 1)
+            index2 = random.randint(0, len(monk.moves) - 1)
+            while index1 == index2:
+                index1 = random.randint(0, len(monk.moves) - 1)
+            moves = copy.deepcopy(monk.moves)
+            moves[index1], moves[index2] = moves[index2], moves[index1]
+            monk_curr = Monk(garden_help, moves)
+            rake(garden_help, monk_curr.moves)
+            monk_curr.fitness = calculate_fitness(garden_help)
+            if y == 0:
+                best_monk = monk_curr
+            if monk_curr.fitness > best_monk.fitness and monk_curr.moves not in tabu:
+                best_monk = monk_curr
+        if best_monk.fitness > head_monk.fitness:
+            head_monk = best_monk
+        tabu.append(best_monk.moves)
+        if len(tabu) > tabusize:
+            tabu.pop(0)
+        if best_monk.fitness == fitness:
+            print_garden(best_monk.garden.garden)
+            print("Monks to find this solution: ", x * y)
+            print("Best monk raked: ", best_monk.fitness)
+            exit()
+    print_garden(head_monk.garden.garden)
+    print("Monks to find this solution: ", x * monks)
+    print("Best monk raked: ", head_monk.fitness)
 
 
 def main():
     x = int(input("Zadaj počet riadkov záhrady: "))
     y = int(input("Zadaj počet stĺpcov záhrady: "))
     zahrada = Garden(x, y)
-    print_garden(zahrada.garden)
-    rake(zahrada, generate_start(x, y))
-    print_garden(zahrada.garden)
-
+    listik = [[1, 5], [2, 1], [3, 4], [4, 2], [6, 8], [6, 9]]
+    randomKamen(0.05, zahrada)
+    best_fitness = 0
+    for o in range(zahrada.row):
+        for p in range(zahrada.column):
+            if zahrada.garden[o][p] == 0:
+                best_fitness += 1
+    zahrada1 = copy.deepcopy(zahrada)
+    monk = Monk(zahrada1, generate_start(x, y))
+    rake(zahrada1, monk.moves)
+    monk.fitness = calculate_fitness(zahrada1)
+    if monk.fitness == best_fitness:
+        print_garden(monk.garden.garden)
+        print("Monks to find this solution: 1")
+        print("Best monk raked: ", monk.fitness)
+    else:
+        monastery(monk, zahrada, best_fitness)
 
 main()
