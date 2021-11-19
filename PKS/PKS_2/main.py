@@ -1,19 +1,18 @@
 import socket
-import threading
 import zlib
 import os
+import math
 
 
-def data_packet(num, crc, data):
-    packet = num.to_bytes(3, byteorder="big") + crc.to_bytes(4, byteorder="big") + data.encode()
+def data_packet(crc, data):
+    packet = crc.to_bytes(4, byteorder="big") + data.encode()
     return packet
 
 
 def decode_data(data_to_decode):
-    number = int.from_bytes(data_to_decode[:3], byteorder="big")
-    crc = int.from_bytes(data_to_decode[3:7], byteorder="big")
-    data = data_to_decode[7:].decode()
-    return number, crc, data
+    crc = int.from_bytes(data_to_decode[0:4], byteorder="big")
+    data = data_to_decode[4:].decode()
+    return crc, data
 
 
 def info_packet(type, file="", numofpackets=0):
@@ -43,42 +42,53 @@ def decode_info(data_to_decode):
         return type, numofpackets, data
 
 
-def keep_alive(dstsocket, port):
-
+def keep_alive(socket, port, ip):
     while True:
-        dstsocket.sendto(info_packet(7), port)
-        try:
-            dstsocket.settimeout(5)
-        finally:
-            return -1
+        socket.sendto(info_packet(7), (ip, port))
+        socket.settimeout(10)
 
 
-def listen_to_wrong(client, dataToSend):
-    while True:
-        bytePair = client.recvfrom(1500)
-        data = bytePair[0].decode()
-        tmp, number_of_packet = decode_info(data)
-        if tmp == 5:
-            dataToSend.append(number_of_packet)
-        elif tmp == 1:
-            return dataToSend
-
+def printdata(listik):
+    stringik = ""
+    for x in range(len(listik)):
+      stringik += listik[x]
+    print(stringik)
 
 def startserver():
+    fragments = 0
+    data = []
     print("Port you want to listen on: ", end="")
     port = int(input())
     localIP = socket.gethostbyname(socket.gethostname())
     print(localIP)
     serverSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     serverSocket.bind((localIP, port))
+    received, messagefrom = serverSocket.recvfrom(1500)
+    print("Connected from", messagefrom[0])
+    flag = decode_info(received)[0]
+    pocet = decode_info(received)[1]
+    if flag == 3:
+        while fragments < pocet:
+            received, messagefrom = serverSocket.recvfrom(1500)
+            if decode_data(received)[0] == zlib.crc32(decode_data(received)[1].encode()):
+                data.append(decode_data(received)[1])
+                serverSocket.sendto(info_packet(1), messagefrom)
+                fragments += 1
+            else:
+                serverSocket.sendto(info_packet(2), messagefrom)
+        print("You received a message: ", end="")
+        serverSocket.sendto(info_packet(6), messagefrom)
+        printdata(data)
+    #if flag == 4:
+
+    #if flag == 7:
 
 
-#0 - zacatie kom.
-#1- ACK (server->client)
-#2 - NACK (server->client)
+
+#1- ACK
+#2 - NACK
 #3 - message
 #4 - file
-#5 - request na dodanie chybajucich fragmentov
 #6 - Global ack(uspesny konec vsetkeho)
 #7 - keep alive flag
 
@@ -96,75 +106,58 @@ def startclient():
     if choice == "m":
         print("Message you want to send: ", end="")
         data = input()
-        temp = int(len(data)/(frag - 7))
+        temp = math.ceil(len(data)/(frag - 4))
+        if temp == 0:
+            temp = 1
         info = info_packet(3, "", temp)
-        if info == 0:
-            info = 1
         clientSocket.sendto(info, (ip, port))
-        dataToSend = []
         for i in range(temp):
-            help = data[(frag - 7)*i:(frag - 7)*(i+1)]
+            help = data[(frag - 4)*i:(frag - 4)*(i+1)]
             crc = zlib.crc32(help.encode())
-            x = data_packet((i+1), crc, help)
-            dataToSend.append(x)
+            x = data_packet(crc, help)
             clientSocket.sendto(x, (ip, port))
-        bytesPair = clientSocket.recvfrom(1500)
-        message = decode_info(bytesPair[0].decode())
-        messageFrom = bytesPair[1].decode()
-        if message == 6:
-            print("Message was successfully sent to : ", messageFrom)
-        if message == 2:
-            tempToSend = []
-            print("Server is requesting additional data.")
-            clientSocket.sendto(info_packet(1), (ip, port))
-            thread1 = threading.Thread(target=listen_to_wrong(clientSocket, tempToSend))
-            thread1.start()
-            thread1.join()
-            for k in range(len(tempToSend)):
-                x = dataToSend[k]
-                clientSocket.sendto(x, (ip, port))
-            bytesPair = clientSocket.recvfrom(1500)
-            message = decode_info(bytesPair[0].decode())
-            messageFrom = bytesPair[1].decode()
-            if message == 6:
-                print("Sent all missing/faulty packets back to server at : ", messageFrom)
+            bytesPair, messagefrom = clientSocket.recvfrom(1500)
+            if decode_info(bytesPair) == 1:
+                print("Packet successfully sent.")
+            elif decode_info(bytesPair) == 2:
+                print("Packet number", i+1, "was not sent right")
+                while decode_info(bytesPair) != 1:
+                    clientSocket.sendto(x, (ip, port))
+                    bytesPair, messagefrom = clientSocket.recvfrom(1500)
+
+        bytesPair, messagefrom = clientSocket.recvfrom(1500)
+        if decode_info(bytesPair) == 6:
+            print("Message successfully sent.")
+                #keep_alive(ip, port)
     if choice == "f":
         print("Input path to file you want to send: ", end="")
         data = input()
+        print("How do you want to save the file on other PC?: ", end="")
+        filename = input()
         f = open(data, "rb")
         filesize = os.path.getsize(data)
-        tmp = int(len(data)/(frag - 7))
-        x = info_packet(4, data, tmp)
+        tmp = math.ceil(len(data)/(frag - 4))
+        x = info_packet(4, filename, tmp)
         clientSocket.sendto(x, (ip, port))
-        dataForSend = []
-        for x in range(filesize):
-            bytes_read = f.read(frag).decode()
-            if not bytes_read:
+        for i in range(tmp):
+            help = f.read(frag).decode()
+            if not help:
                 break
-            crc = zlib.crc32(bytes_read.encode())
-            packet = data_packet(x+1, crc, bytes_read)
-            clientSocket.sendto(packet, (ip, port))
-            dataForSend.append(packet)
-        bytesPair = clientSocket.recvfrom(1500)
-        message = decode_info(bytesPair[0].decode())
-        messageFrom = bytesPair[1].decode()
-        if message == 6:
-            print("Message was successfully sent to : ", messageFrom)
-        if message == 2:
-            tempToSend = []
-            print("Server is requesting additional data.")
-            clientSocket.sendto(info_packet(1), (ip, port))
-            thread2 = threading.Thread(target=listen_to_wrong(clientSocket, tempToSend))
-            thread2.start()
-            thread2.join()
-            for k in range(len(tempToSend)):
-                x = dataForSend[k]
-                clientSocket.sendto(x, (ip, port))
-            bytesPair = clientSocket.recvfrom(1500)
-            message = decode_info(bytesPair[0].decode())
-            messageFrom = bytesPair[1].decode()
-            if message == 6:
-                print("Sent all missing/faulty packets back to server at : ", messageFrom)
+            crc = zlib.crc32(help.encode())
+            x = data_packet(crc, help)
+            clientSocket.sendto(x, (ip, port))
+            bytesPair, messagefrom = clientSocket.recvfrom(1500)
+            if decode_info(bytesPair) == 1:
+                print("Packet successfully sent.")
+            elif decode_info(bytesPair) == 2:
+                print("Packet number", i+1, "was not sent right")
+                while decode_info(bytesPair) != 1:
+                    clientSocket.sendto(x, (ip, port))
+                    bytesPair, messagefrom = clientSocket.recvfrom(1500)
+            elif decode_info(bytesPair) == 6:
+                print("File was successfully sent.")
+                #keep_alive(ip, port)
+
 
 def main():
     print("For role server type \"server\"")
